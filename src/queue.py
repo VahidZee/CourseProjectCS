@@ -46,6 +46,7 @@ class QueMixin:
         if node.next is not None:
             node.next.prev = node.prev
         del node  # todo check
+        assert self.q0_len >= 0 and self.q1_len >= 0, 'fuq!'
         if timestamp:
             self.register_len_history(timestamp)
 
@@ -68,13 +69,14 @@ class QueMixin:
             self.q0_last = node
             self.q0_len += 1
         if node.prev is not None:
-            node.prev.next = node  # chaining together
+            node.prev.next = node  # chaining together with q last
         if self.q0 is None:
             self.q0 = self.q0_last
         if self.q1 is None:
             self.q1 = self.q1_last
         if timestamp:
             self.register_len_history(timestamp)
+        assert self.q0_len >= 0 and self.q1_len >= 0, 'fuq!'
         return node
 
     def __len__(self):
