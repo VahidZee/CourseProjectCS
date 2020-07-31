@@ -113,15 +113,13 @@ class QueMixin:
         self.bored_patients_count[patient.type] += 1
         self.register_finished_service(patient, self.simulation.max_patient_wait)
 
-    def mean_length(self):
-        t = np.array([self.len_history_timestamps[i] - self.len_history_timestamps[i - 1] for i in
-                      range(1, len(self.len_history_timestamps))])
-        q0 = np.array(self.len_history[0][:len(t) - 1]) * t
-        q1 = np.array(self.len_history[1][:len(t) - 1]) * t
-        if self.len_history_timestamps:
-            last_time = self.len_history_timestamps[-1]
-            return (q0 + q1).sum() / last_time, q0.sum() / last_time, q1.sum() / last_time
-        return 0., 0., 0.
+    def mean_length(self) -> tuple: # returns mean total, neg, positive queue lengths
+        if len(self.len_history_timestamps) == 0:
+            return 0., 0., 0.
+        t = np.array(self.len_history_timestamps).reshape(-1)
+        t[1:] = t[1:] - t[:len(t) - 1]
+        avg = (np.array(self.len_history) * t).sum(1)/t.sum()
+        return avg.sum(), avg[0], avg[1]
 
     def __eq__(self, other):
         return other and self.id == other.id
