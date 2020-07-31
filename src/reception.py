@@ -22,6 +22,7 @@ class Reception(QueMixin):
         room = self.find_room()
         patient.queue = room
         patient.room = room
+        self.register_finished_service(patient, patient.scheduler_start - patient.scheduler_arrival)
         patient.checkpoint = patient.scheduler_departure
         self.remove_head(patient, patient.checkpoint)
         return room
