@@ -100,11 +100,18 @@ class QueMixin:
     def register_finished_service(self, patient: Patient, wait_time):  # wait history and simulation history
         self.wait_history[patient.type].append(wait_time)
         if patient.bored:
-            self.simulation.time_spent_history.append(
-                patient.checkpoint - patient.scheduler_arrival + self.simulation.max_patient_wait)
+            if patient.type:
+                self.simulation.time_spent_history[1].append(
+                    patient.checkpoint - patient.scheduler_arrival + self.simulation.max_patient_wait)
+            else:
+                self.simulation.time_spent_history[0].append(
+                    patient.checkpoint - patient.scheduler_arrival + self.simulation.max_patient_wait)
             self.simulation.finished_patients.add(patient.id)
         if self.id:
-            self.simulation.time_spent_history.append(patient.departure - patient.scheduler_arrival)
+            if patient.type:
+                self.simulation.time_spent_history[1].append(patient.departure - patient.scheduler_arrival)
+            else:
+                self.simulation.time_spent_history[0].append(patient.departure - patient.scheduler_arrival)
             self.simulation.finished_patients.add(patient.id)
 
     def register_bored_patient(self, patient):
