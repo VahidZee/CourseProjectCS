@@ -22,10 +22,11 @@ class Simulation:
         self.time = np.zeros(1, np.double)
         self.action_list = []
         self.progress = None
+        self.if_check_accuracy = False
 
         # results
         self.simulated_count = np.zeros(2, np.int32)
-        self.time_spent_history = [[], []]
+        self.time_spent_history = [[],[]]
         self.accuracy_history = [0]
         self.attendance_history = []
 
@@ -73,11 +74,12 @@ class Simulation:
         self.progress.close()
 
     def check_accuracy(self):
-        sd = np.std(self.time_spent_history)
-        mean = np.mean(self.time_spent_history)
-        acc = 1.96 * sd / (np.sqrt(len(self.time_spent_history)) * mean)
-        if 1 - acc > 0.95 and acc != 0:
-            print("Needed number of patients for 95% of accuracy: ", len(self.time_spent_history))
-            return len(self.time_spent_history)
-        else:
-            return 0.
+        if not self.if_check_accuracy:
+            f = np.array(self.time_spent_history[0]+self.time_spent_history[1]).flatten()
+            sd = np.std(f)
+            mean = np.mean(f)
+            acc = 1.96 * sd / (np.sqrt(len(f)) * mean)
+            if 1 - acc > 0.95 and acc != 0:
+                print("Needed number of patients for 95% of accuracy: ", len(f))
+                self.if_check_accuracy = True
+        return 0.
