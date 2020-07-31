@@ -15,6 +15,7 @@ class QueMixin:
         self.q1 = None
         self.q1_last = None
         self.q1_len = 0
+        self.if_queue = False
 
         # simulation requirements
         self.last_checkpoint = np.zeros(1, dtype=np.double)
@@ -56,6 +57,13 @@ class QueMixin:
             self.remove_node(self.q0, timestamp)
 
     def add_patient(self, patient: Patient, timestamp=None):
+        #print(self.id,self.q0_len+self.q1_len)
+        if self.id:
+            if len(self.simulation.reception.rooms[self.id-1].doc_mu) <= self.q0_len+self.q1_len:
+                self.if_queue = True
+        else:
+            if 1 <= self.q0_len+self.q1_len:
+                self.if_queue = True
         if self.id:
             self.simulation.reception.rooms_q_len[self.id - 1] += 1
         patient.queue = self

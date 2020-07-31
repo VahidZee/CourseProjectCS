@@ -72,6 +72,14 @@ class Simulation:
         #     print("action:", action)
         #     print("p history:", self.shit[action.id])
         self.progress.close()
+    def check_if_queue(self):
+        if self.reception.if_queue:
+            return False
+        else:
+            for room in self.reception.rooms:
+                if room.if_queue:
+                    return False
+        return True
 
     def check_accuracy(self):
         if not self.if_check_accuracy:

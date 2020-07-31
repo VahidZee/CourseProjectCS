@@ -66,8 +66,7 @@ class Action:
                 Action(id=self.id, time=self.time, action_type=ACTION_VISIT_START, patient=self.patient, node=node, ))
         else:
             simulation.add_action(
-                Action(self.id, time=self.time + simulation.max_patient_wait - (
-                            self.patient.scheduler_start - self.patient.scheduler_arrival), action_type=ACTION_BORED,
+                Action(self.id, time=self.time + simulation.max_patient_wait, action_type=ACTION_BORED,
                        patient=self.patient, queue=room, node=node, ))
 
     def _visit_start_exec(self, simulation):
@@ -166,3 +165,4 @@ class Action:
         # return "{:03}-{}-{}({})".format(self.id, self.time, action, '' if self.parent is None else
         # '{},{},{}'.format(self.parent.time, self.parent.id, par_action))
         return "{:03}-{}-{}".format(self.id, self.time, action)
+
