@@ -113,13 +113,18 @@ class QueMixin:
         self.bored_patients_count[patient.type] += 1
         self.register_finished_service(patient, self.simulation.max_patient_wait)
 
-    def mean_length(self) -> tuple: # returns mean total, neg, positive queue lengths
+    def mean_length(self) -> tuple:  # returns mean total, neg, positive queue lengths
         if len(self.len_history_timestamps) == 0:
             return 0., 0., 0.
         t = np.array(self.len_history_timestamps).reshape(-1)
         t[1:] = t[1:] - t[:len(t) - 1]
-        avg = (np.array(self.len_history) * t).sum(1)/t.sum()
+        avg = (np.array(self.len_history) * t).sum(1) / t.sum()
         return avg.sum(), avg[0], avg[1]
+
+    def mean_wait(self) -> tuple:  # returns mean total, neg, positive queue wait duration
+        hist0 = np.array(self.wait_history[0], dtype=np.double).reshape(-1)
+        hist1 = np.array(self.wait_history[1], dtype=np.double).reshape(-1)
+        return np.append(hist0, hist1).mean(), hist0.mean(), hist1.mean()
 
     def __eq__(self, other):
         return other and self.id == other.id
@@ -132,9 +137,7 @@ class QueMixin:
         plt.show()
 
     def __repr__(self):
-        return 'Que #{} - time:{}\n\t* len: {} - ({}, {})\n\t* mean len:{} - ({}, {})\n\tmean wait:{} - ({}, {})\n'.format(
-            self.id, self.last_checkpoint, len(self), self.q0_len, self.q1_len, *self.mean_length(),
-            0 if self.simulated_count.sum() == 0 else np.array(self.wait_history[0] + self.wait_history[1]).mean(),
-            0 if self.simulated_count[0] else np.array(self.wait_history[0]).mean(),
-            0 if self.simulated_count[1] else np.array(self.wait_history[1]).mean()
-        )
+        len_res = '* mean-len {:.04}:({:.04}, {:.04})'.format(*self.mean_length())
+        wait_res = '* mean-wait {:.04}:({:.04}, {:.04})'.format(*self.mean_wait())
+        return 'Que #{} - time:{}\n\t* len: {} - ({}, {})\n\t{}\n\t{}\n'.format(
+            self.id, self.last_checkpoint, len(self), self.q0_len, self.q1_len, len_res, wait_res)
