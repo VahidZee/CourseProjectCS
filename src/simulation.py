@@ -4,7 +4,7 @@ from src.reception import Reception
 from src.room import Room
 from src.action import Action, ACTION_ARRIVAL
 import heapq
-from collections import defaultdict
+import matplotlib.pyplot as plt
 
 
 class Simulation:
@@ -26,9 +26,12 @@ class Simulation:
 
         # results
         self.simulated_count = np.zeros(2, np.int32)
-        self.time_spent_history = [[],[]]
+        self.bored_patients_count = np.zeros(2, np.int32)
+        self.time_spent_history = [[], []]
+        self.wait_history = [[], []]
         self.accuracy_history = [0]
-        self.attendance_history = []
+        self.attendance_history = [[], []]
+        self.attendance_history_time_stamps = []
 
     def get_arrival_interval(self):
         return np.random.exponential(self.arrival_rate)
@@ -36,6 +39,9 @@ class Simulation:
     def add_action(self, action):
         if action.id not in self.finished_patients:
             heapq.heappush(self.action_list, action)
+
+    def find_optimum(self):  # todo Sana/ Emad
+        pass
 
     @staticmethod
     def get_input_dict():
@@ -49,29 +55,14 @@ class Simulation:
 
     def simulate(self):
         self.progress = tqdm.tqdm(total=self.simulation_count)
-        # self.shit = defaultdict(list)
-        # self.done = list()
         self.add_action(Action(0, 0, ACTION_ARRIVAL))
-        # try:
         while self.action_list:
             action = heapq.heappop(self.action_list)
-            # print("action:", action)
+            self.time = action.time
             action.execute(self)
             del action
-            # print("list:", sorted(self.action_list))
-
-            # self.shit[action.id].append(action)
-            # print("p history:", self.shit[action.id])
-            # self.done.append(action)
-            # print("done:", sorted(self.done)[::-1])
-            # print(f'q1({self.reception.q1_len}):', self.reception.q1, f'q1({self.reception.q0_len}):',
-            #       self.reception.q0, )
-            # input()
-            # print("action:", action)
-        # except :
-        #     print("action:", action)
-        #     print("p history:", self.shit[action.id])
         self.progress.close()
+
     def check_if_queue(self):
         if self.reception.if_queue:
             return False
@@ -81,13 +72,106 @@ class Simulation:
                     return False
         return True
 
+    def plot_queue_lens_history(self):
+        self.reception.plot_len_room_history()
+        for room in self.reception.rooms:
+            room.plot_len_room_history()
+
+    def plot_wait_frequency(self):
+        if len(self.wait_history[0]):
+            plt.hist(np.array(self.wait_history[0], dtype=np.double).reshape(-1), label='Corona Positive Patients',
+                     density=True, alpha=0.6, bins=50)
+        if len(self.wait_history[1]):
+            plt.hist(np.array(self.wait_history[1], dtype=np.double).reshape(-1), label='Corona Negative Patients',
+                     density=True, alpha=0.6, bins=50)
+        plt.title('Simulation Wait Frequency')
+        plt.xlabel('wait duration')
+        plt.legend()
+        plt.show()
+
+    def plot_response_time_frequency(self):
+        if len(self.time_spent_history[0]):
+            plt.hist(np.array(self.time_spent_history[0], dtype=np.double).reshape(-1),
+                     label='Corona Positive Patients',
+                     density=True, alpha=0.6, bins=50)
+        if len(self.time_spent_history[1]):
+            plt.hist(np.array(self.time_spent_history[1], dtype=np.double).reshape(-1),
+                     label='Corona Negative Patients',
+                     density=True, alpha=0.6, bins=50)
+        plt.title('Simulation Response Time Frequency')
+        plt.xlabel('response duration')
+        plt.legend()
+        plt.show()
+
+    def plot_attendance_frequency(self):
+        if len(self.attendance_history[0]):
+            plt.hist(np.array(self.attendance_history[0]).reshape(-1),
+                     label='Corona Positive Patients', alpha=0.6, bins=50)
+        if len(self.attendance_history[1]):
+            plt.hist(np.array(self.attendance_history[1]).reshape(-1),
+                     label='Corona Negative Patients', alpha=0.6, bins=50)
+        plt.title('Simulation Attendance Frequency')
+        plt.xlabel('patients count')
+        plt.legend()
+        plt.show()
+
+    def mean_time_spent(self):
+        m0 = np.array(self.time_spent_history[0], dtype=np.double).reshape(-1)
+        m1 = np.array(self.time_spent_history[1], dtype=np.double).reshape(-1)
+        return np.append(m0, m1).mean(), m0.mean(), m1.mean()
+
+    def mean_wait_time(self):
+        m0 = np.array(self.wait_history[0], dtype=np.double).reshape(-1)
+        m1 = np.array(self.wait_history[1], dtype=np.double).reshape(-1)
+        return np.append(m0, m1).mean(), m0.mean(), m1.mean()
+
+    def print_sub_results(self):
+        print("Reception:")
+        print(self.reception)
+        print("Rooms:")
+        for room in self.reception.rooms:
+            print(room)
+
+    def register_attendance(self, ptype, change, timestamp):
+        if len(self.attendance_history_time_stamps) == 0:
+            self.attendance_history_time_stamps.append(timestamp)
+            self.attendance_history[ptype].append(change)
+            self.attendance_history[1 - ptype].append(0)
+        elif self.attendance_history_time_stamps[-1] == timestamp:
+            self.attendance_history[ptype][-1] += change
+        else:
+            self.attendance_history[ptype].append(self.attendance_history[ptype][-1] + change)
+            self.attendance_history[1 - ptype].append(self.attendance_history[1 - ptype][-1])
+            self.attendance_history_time_stamps.append(timestamp)
+
+    def plot_attendance_history(self):
+        plt.plot(self.attendance_history_time_stamps, self.attendance_history[1], label='Corona Positive Patients',
+                 alpha=0.6)
+        plt.plot(self.attendance_history_time_stamps, self.attendance_history[0], label='Corona Negative Patients',
+                 alpha=0.6)
+        plt.plot(self.attendance_history_time_stamps,
+                 np.array(self.attendance_history[0]) + np.array(self.attendance_history[1]), label='Total', alpha=0.4)
+        plt.title('Simulation - Attendance/Time')
+        plt.legend()
+        plt.show()
+
+    def __repr__(self):
+        time_spent = '* mean time spent: {:.07} ({:.07}, {:.07})'.format(*self.mean_time_spent())
+        wait_mean = '* mean waiting time: {:.04} ({:.04}, {:.04})'.format(*self.mean_wait_time())
+        patients = '* patients {} ({}, {}) - bored {} ({}, {})'.format(
+            self.simulated_count.sum(), self.simulated_count[0], self.simulated_count[1],
+            self.bored_patients_count.sum(), self.bored_patients_count[0], self.bored_patients_count[1]
+        )
+        return 'Simulation:\n\t{}\n\t{}\n\t{}'.format(time_spent, wait_mean, patients)
+
     def check_accuracy(self):
         if not self.if_check_accuracy:
-            f = np.array(self.time_spent_history[0]+self.time_spent_history[1]).flatten()
+            f = np.append(np.array(self.time_spent_history[1]).reshape(-1),
+                          np.array(self.time_spent_history[0]).reshape(-1)).flatten()
             sd = np.std(f)
             mean = np.mean(f)
-            acc = 1.96 * sd / (np.sqrt(len(f)) * mean)
+            acc = 1.96 * sd / (np.sqrt(f.shape[0]) * mean)
             if 1 - acc > 0.95 and acc != 0:
-                print("Needed number of patients for 95% of accuracy: ", len(f))
+                print("Needed Number of simulations for 95% accuracy is:", f.shape[0])
                 self.if_check_accuracy = True
         return 0.

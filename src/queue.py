@@ -57,12 +57,12 @@ class QueMixin:
             self.remove_node(self.q0, timestamp)
 
     def add_patient(self, patient: Patient, timestamp=None):
-        #print(self.id,self.q0_len+self.q1_len)
+        # print(self.id,self.q0_len+self.q1_len)
         if self.id:
-            if len(self.simulation.reception.rooms[self.id-1].doc_mu) <= self.q0_len+self.q1_len:
+            if len(self.simulation.reception.rooms[self.id - 1].doc_mu) <= self.q0_len + self.q1_len:
                 self.if_queue = True
         else:
-            if 1 <= self.q0_len+self.q1_len:
+            if 1 <= self.q0_len + self.q1_len:
                 self.if_queue = True
         if self.id:
             self.simulation.reception.rooms_q_len[self.id - 1] += 1
@@ -83,6 +83,7 @@ class QueMixin:
             self.q1 = self.q1_last
         if timestamp:
             self.register_len_history(timestamp)
+        assert self.q0_len >= 0 and self.q1_len >= 0, 'fuq!'
         return node
 
     def __len__(self):
@@ -107,21 +108,19 @@ class QueMixin:
 
     def register_finished_service(self, patient: Patient, wait_time):  # wait history and simulation history
         self.wait_history[patient.type].append(wait_time)
+        self.simulated_count[patient.type] += 1
         if patient.bored:
-            if patient.type:
-                self.simulation.time_spent_history[1].append(
-                    patient.checkpoint - patient.scheduler_arrival + self.simulation.max_patient_wait)
-            else:
-                self.simulation.time_spent_history[0].append(
-                    patient.checkpoint - patient.scheduler_arrival + self.simulation.max_patient_wait)
+            self.simulation.time_spent_history[patient.type].append(
+                patient.checkpoint - patient.scheduler_arrival + self.simulation.max_patient_wait)
+            self.simulation.wait_history[patient.type].append(self.simulation.max_patient_wait)
+        elif self.id:
+            self.simulation.wait_history[patient.type].append(
+                patient.scheduler_start - patient.scheduler_arrival + patient.start - patient.scheduler_departure)
+            self.simulation.time_spent_history[patient.type].append(patient.departure - patient.scheduler_arrival)
+        if self.id or patient.bored:
             self.simulation.finished_patients.add(patient.id)
-        if self.id:
-            if patient.type:
-                self.simulation.time_spent_history[1].append(patient.departure - patient.scheduler_arrival)
-            else:
-                self.simulation.time_spent_history[0].append(patient.departure - patient.scheduler_arrival)
-            self.simulation.finished_patients.add(patient.id)
-        self.simulation.check_accuracy()
+            self.simulation.simulated_count[patient.type] += 1
+            self.simulation.check_accuracy()
 
     def register_bored_patient(self, patient):
         patient.bored = True
@@ -145,15 +144,34 @@ class QueMixin:
     def __eq__(self, other):
         return other and self.id == other.id
 
-    def plot_room_history(self):
-        plt.plot(self.len_history_timestamps, self.len_history[1], label='Corona Positive Patients')
-        plt.plot(self.len_history_timestamps, self.len_history[0], label='Corona Negative Patients')
+    def plot_len_history(self):
+        plt.plot(self.len_history_timestamps, self.len_history[1], label='Corona Positive Patients', alpha=0.6)
+        plt.plot(self.len_history_timestamps, self.len_history[0], label='Corona Negative Patients', alpha=0.6)
+        plt.plot(self.len_history_timestamps, np.array(self.len_history[0]) + np.array(self.len_history[1]),
+                 label='Total', alpha=0.4)
+
         plt.title('Que #{} - Length/Time'.format(self.id))
+        plt.legend()
+        plt.show()
+
+    def plot_wait_histogram(self):
+        if len(self.wait_history[0]):
+            plt.hist(np.array(self.wait_history[0], dtype=np.double).reshape(-1), label='Corona Positive Patients',
+                     density=True, alpha=0.6, bins=50)
+        if len(self.wait_history[1]):
+            plt.hist(np.array(self.wait_history[1], dtype=np.double).reshape(-1), label='Corona Negative Patients',
+                     density=True, alpha=0.6, bins=50)
+        plt.title('Que #{} - Wait Frequency'.format(self.id))
+        plt.xlabel('wait duration')
         plt.legend()
         plt.show()
 
     def __repr__(self):
         len_res = '* mean-len {:.04}:({:.04}, {:.04})'.format(*self.mean_length())
         wait_res = '* mean-wait {:.04}:({:.04}, {:.04})'.format(*self.mean_wait())
-        return 'Que #{} - time:{}\n\t* len: {} - ({}, {})\n\t{}\n\t{}\n'.format(
-            self.id, self.last_checkpoint, len(self), self.q0_len, self.q1_len, len_res, wait_res)
+        patients = '* patients {} ({}, {}) - bored {} ({}, {})'.format(
+            self.simulated_count.sum(), self.simulated_count[0], self.simulated_count[1],
+            self.bored_patients_count.sum(), self.bored_patients_count[0], self.bored_patients_count[1]
+        )
+        return 'Que #{} - time:{}\n\t* len: {} - ({}, {})\n\t{}\n\t{}\n\t{}\n'.format(
+            self.id, self.last_checkpoint, len(self), self.q0_len, self.q1_len, len_res, wait_res, patients)

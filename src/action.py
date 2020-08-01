@@ -26,6 +26,7 @@ class Action:
         self.patient = Patient(copy.copy(simulation.num_patients), self.time)
         node = simulation.reception.add_patient(self.patient, self.time)
         simulation.num_patients += 1
+        simulation.register_attendance(self.patient.type, +1, self.time)
         simulation.progress.update(1)
         if len(simulation.reception) == 1:
             self.patient.scheduler_start = self.time
@@ -80,6 +81,7 @@ class Action:
 
     def _visit_departure_exec(self, simulation):
         self.patient.room.departure(self.patient)
+        simulation.register_attendance(self.patient.type, -1, self.time)
         # simulation.accuracy_history.append(simulation.check_accuracy()) # Todo: check?
         if len(self.patient.room):
             next_node = self.patient.room.head()
@@ -96,6 +98,7 @@ class Action:
             # if self.time != self.patient.checkpoint + simulation.max_patient_wait:
             #     print('well fuq')
             # print(self.queue.q0_len, self.queue.q1_len)
+            simulation.register_attendance(self.patient.type, -1, self.time)
             self.queue.remove_node(self.node, self.patient.checkpoint + simulation.max_patient_wait)
             # print(self.queue.q0_len, self.queue.q1_len)
 
@@ -165,4 +168,3 @@ class Action:
         # return "{:03}-{}-{}({})".format(self.id, self.time, action, '' if self.parent is None else
         # '{},{},{}'.format(self.parent.time, self.parent.id, par_action))
         return "{:03}-{}-{}".format(self.id, self.time, action)
-
