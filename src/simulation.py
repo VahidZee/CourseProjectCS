@@ -175,3 +175,15 @@ class Simulation:
                 print("Needed Number of simulations for 95% accuracy is:", f.shape[0])
                 self.if_check_accuracy = True
         return 0.
+
+    def find_mean_length(self):
+        length = self.reception.mean_length()[0]
+        for room in self.reception.rooms:
+            length += room.mean_length()[0]
+        return length / (len(self.reception.rooms) + 1)
+
+    def find_mean_mu(self):
+        mean_mu = self.reception.mu
+        for room in self.reception.rooms:
+            mean_mu += sum(room.doc_mu) / len(room.doc_mu)
+        return mean_mu / (len(self.reception.rooms) + 1)
