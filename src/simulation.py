@@ -190,6 +190,7 @@ class Simulation:
             finished = (len_mu == 0.)
             mean_mu.append(mu)
             mean_length.append(len_mu)
+        print("Answer:", mu)
         plt.plot(np.array(mean_mu, dtype=np.double).flatten(), np.array(mean_length, dtype=np.double).flatten())
         plt.xlabel('Average Service Rate')
         plt.ylabel('Average Queue Length')
