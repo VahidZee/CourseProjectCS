@@ -5,16 +5,17 @@ from src.room import Room
 from src.action import Action, ACTION_ARRIVAL
 import heapq
 import matplotlib.pyplot as plt
+import copy
 
 
 class Simulation:
-    def __init__(self, simulation_count, hparams):
+    def __init__(self, simulation_count, hparams, disable_progress=False):
         self.simulation_count = simulation_count
         self.max_patient_wait = hparams['max_patient_wait']
-        self.arrival_rate = hparams['arrival_rate']
+        self.arrival_rate = 1. / hparams['arrival_rate']
         self.reception = Reception(
-            self, [Room(self, i + 1, mu) for i, mu in enumerate(hparams['rooms'])], hparams['reception_mu'])
-
+            self, [Room(self, i + 1, 1. / mu) for i, mu in enumerate(hparams['rooms'])], 1. / hparams['reception_mu'])
+        self.hparams = hparams
         self.bored_patients = set()
         self.finished_patients = set()
         self.bored_patients_count = np.zeros(2, np.int32)
@@ -22,6 +23,7 @@ class Simulation:
         self.time = np.zeros(1, np.double)
         self.action_list = []
         self.progress = None
+        self.disable_progress = disable_progress
         self.if_check_accuracy = False
 
         # results
@@ -40,9 +42,6 @@ class Simulation:
         if action.id not in self.finished_patients:
             heapq.heappush(self.action_list, action)
 
-    def find_optimum(self):  # todo Sana/ Emad
-        pass
-
     @staticmethod
     def get_input_dict():
         m, l, a, mu = input().split()
@@ -54,7 +53,7 @@ class Simulation:
         return hparams
 
     def simulate(self):
-        self.progress = tqdm.tqdm(total=self.simulation_count)
+        self.progress = tqdm.tqdm(total=self.simulation_count, disable=self.disable_progress)
         self.add_action(Action(0, 0, ACTION_ARRIVAL))
         while self.action_list:
             action = heapq.heappop(self.action_list)
@@ -73,7 +72,7 @@ class Simulation:
         return True
 
     def plot_queue_lens_history(self):
-        self.reception.plot_len_room_history()
+        self.reception.plot_len_history()
         for room in self.reception.rooms:
             room.plot_len_room_history()
 
@@ -132,7 +131,7 @@ class Simulation:
         for room in self.reception.rooms:
             print(room)
 
-    def register_attendance(self, ptype, change, timestamp):
+    def register_attendance(self, ptype: int, change, timestamp):
         if len(self.attendance_history_time_stamps) == 0:
             self.attendance_history_time_stamps.append(timestamp)
             self.attendance_history[ptype].append(change)
@@ -172,18 +171,30 @@ class Simulation:
             mean = np.mean(f)
             acc = 1.96 * sd / (np.sqrt(f.shape[0]) * mean)
             if 1 - acc > 0.95 and acc != 0:
-                print("Needed Number of simulations for 95% accuracy is:", f.shape[0])
+                if not self.disable_progress:
+                    print("Needed Number of simulations for 95% accuracy is:", f.shape[0])
                 self.if_check_accuracy = True
         return 0.
 
-    def find_mean_length(self):
-        length = self.reception.mean_length()[0]
-        for room in self.reception.rooms:
-            length += room.mean_length()[0]
-        return length / (len(self.reception.rooms) + 1)
+    def find_optimum_service_rate(self, scale=1.5, sim_size=10 ** 4):
+        mean_mu, mean_length = [], []
+        finished = False
+        hparams = copy.deepcopy(self.hparams)
+        mu = np.array([room.mean() for room in hparams['rooms']]).mean()
+        while not finished:
+            hparams['rooms'] = [room * scale for room in hparams['rooms']]
+            mu = mu * scale
+            sim = Simulation(sim_size, hparams, disable_progress=True)
+            sim.simulate()
+            len_mu = sim.find_mean_length()
+            finished = (len_mu == 0.)
+            mean_mu.append(mu)
+            mean_length.append(len_mu)
+        plt.plot(np.array(mean_mu, dtype=np.double).flatten(), np.array(mean_length, dtype=np.double).flatten())
+        plt.xlabel('Average Service Rate')
+        plt.ylabel('Average Queue Length')
+        plt.title('Optimum Doctors Service rate')
+        plt.show()
 
-    def find_mean_mu(self):
-        mean_mu = self.reception.mu
-        for room in self.reception.rooms:
-            mean_mu += sum(room.doc_mu) / len(room.doc_mu)
-        return mean_mu / (len(self.reception.rooms) + 1)
+    def find_mean_length(self):
+        return np.array([room.mean_length()[0] for room in self.reception.rooms]).mean()

@@ -54,7 +54,8 @@ class Action:
             next_node = simulation.reception.head()
             # print(next_node, simulation.reception.q0_len, simulation.reception.q1_len, len(simulation.reception),
             #       simulation.reception.q0, simulation.reception.q1)
-            next_patient = next_node.patient
+            # next_patient = next_node.patient
+            next_patient = next_node
             next_patient.scheduler_start = self.time
             next_patient.scheduler_departure = self.time + simulation.reception.get_service_time()
             simulation.add_action(
@@ -73,7 +74,8 @@ class Action:
     def _visit_start_exec(self, simulation):
         if self.id in simulation.bored_patients:
             return
-        self.patient.room.remove_node(self.node, self.time)
+        # self.patient.room.remove_node(self.node, self.time)
+        self.patient.room.remove_patient(self.patient, self.time)
         self.patient.departure = self.patient.start + self.patient.room.get_service_time(self.patient.dr_id)
         simulation.add_action(
             Action(id=self.id, time=self.patient.departure, action_type=ACTION_VISIT_DEPARTURE,
@@ -85,21 +87,25 @@ class Action:
         # simulation.accuracy_history.append(simulation.check_accuracy()) # Todo: check?
         if len(self.patient.room):
             next_node = self.patient.room.head()
-            next_patient = next_node.patient
+            # next_patient = next_node.patient
+            next_patient = next_node
+            self.patient.room.assign_doctor(next_patient)
             next_patient.start = self.time
             simulation.add_action(
                 Action(id=next_patient.id, time=self.time, action_type=ACTION_VISIT_START, patient=next_patient,
                        node=next_node, ))
 
     def _bored_exec(self, simulation):
-        if self.id not in simulation.finished_patients and self.queue == self.patient.queue:
+        if self.patient.id not in simulation.finished_patients and self.queue == self.patient.queue:
+            # print(f"******* {self.time} - got bored *******\n", self.patient)
             # print(self.id, "got bored!!")
             # print("----------")
             # if self.time != self.patient.checkpoint + simulation.max_patient_wait:
             #     print('well fuq')
             # print(self.queue.q0_len, self.queue.q1_len)
             simulation.register_attendance(self.patient.type, -1, self.time)
-            self.queue.remove_node(self.node, self.patient.checkpoint + simulation.max_patient_wait)
+            # self.queue.remove_node(self.node, self.patient.checkpoint + simulation.max_patient_wait)
+            self.queue.remove_patient(self.patient, self.time)
             # print(self.queue.q0_len, self.queue.q1_len)
 
             simulation.bored_patients_count[self.patient.type] += 1
@@ -108,6 +114,8 @@ class Action:
 
             simulation.bored_patients.add(self.patient.id)
             # print(self.queue.q0_len, self.queue.q1_len)
+        # else:
+            # print(self.patient)
 
     def execute(self, simulation):
         if self.type == ACTION_BORED:

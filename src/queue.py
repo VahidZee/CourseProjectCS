@@ -9,12 +9,14 @@ class QueMixin:
     def __init__(self, simulation, que_id):
         self.simulation = simulation
         self.id = que_id
-        self.q0 = None
-        self.q0_last = None
-        self.q0_len = 0
-        self.q1 = None
-        self.q1_last = None
-        self.q1_len = 0
+        # self.q0 = None
+        # self.q0_last = None
+        # self.q0_len = 0
+        # self.q1 = None
+        # self.q1_last = None
+        # self.q1_len = 0
+        self.listq0 = []
+        self.listq1 = []
         self.if_queue = False
 
         # simulation requirements
@@ -27,84 +29,114 @@ class QueMixin:
         self.bored_patients_count = np.zeros(2, dtype=np.int32)
         self.simulated_count = np.zeros(2, dtype=np.int32)
 
-    def remove_node(self, node, timestamp=None):
-        if self.id:
-            self.simulation.reception.rooms_q_len[self.id - 1] -= 1
-        if node.patient.type:
-            self.q1_len -= 1
-            if node.next is None:
-                self.q1_last = node.prev
-            if node.prev is None:
-                self.q1 = node.next
-        else:
-            self.q0_len -= 1
-            if node.next is None:
-                self.q0_last = node.prev
-            if node.prev is None:
-                self.q0 = node.next
-        if node.prev is not None:
-            node.prev.next = node.next
-        if node.next is not None:
-            node.next.prev = node.prev
-        del node  # todo check
-        if timestamp:
-            self.register_len_history(timestamp)
+    # def remove_node(self, node, timestamp=None):
+    #     if self.id:
+    #         self.simulation.reception.rooms_q_len[self.id - 1] -= 1
+    #     if node.patient.type:
+    #         self.q1_len -= 1
+    #         if node.next is None:
+    #             self.q1_last = node.prev
+    #         if node.prev is None:
+    #             self.q1 = node.next
+    #     else:
+    #         self.q0_len -= 1
+    #         if node.next is None:
+    #             self.q0_last = node.prev
+    #         if node.prev is None:
+    #             self.q0 = node.next
+    #     if node.prev is not None:
+    #         node.prev.next = node.next
+    #     if node.next is not None:
+    #         node.next.prev = node.prev
+    #     del node  # todo check
+    #     if timestamp:
+    #         self.register_len_history(timestamp)
 
-    def remove_head(self, patient, timestamp=None):
-        if patient.type:
-            self.remove_node(self.q1, timestamp)
-        else:
-            self.remove_node(self.q0, timestamp)
-
-    def add_patient(self, patient: Patient, timestamp=None):
-        # print(self.id,self.q0_len+self.q1_len)
-        if self.id:
-            if len(self.simulation.reception.rooms[self.id - 1].doc_mu) <= self.q0_len + self.q1_len:
-                self.if_queue = True
-        else:
-            if 1 <= self.q0_len + self.q1_len:
-                self.if_queue = True
-        if self.id:
-            self.simulation.reception.rooms_q_len[self.id - 1] += 1
+    def add_patient(self, patient, timestamp):
         patient.queue = self
         if patient.type:
-            node = Node(patient, None, self.q1_last)
-            self.q1_last = node
-            self.q1_len += 1
+            self.listq1.append(patient)
         else:
-            node = Node(patient, None, self.q0_last)
-            self.q0_last = node
-            self.q0_len += 1
-        if node.prev is not None:
-            node.prev.next = node  # chaining together
-        if self.q0 is None:
-            self.q0 = self.q0_last
-        if self.q1 is None:
-            self.q1 = self.q1_last
+            self.listq0.append(patient)
         if timestamp:
             self.register_len_history(timestamp)
-        assert self.q0_len >= 0 and self.q1_len >= 0, 'fuq!'
-        return node
+
+    def remove_patient(self, patient, timestamp):
+        found = False
+        if patient.type:
+            if patient in self.listq1:
+                self.listq1.remove(patient)
+                found = True
+        elif patient in self.listq0:
+            self.listq0.remove(patient)
+        self.register_len_history(timestamp)
+
+    # def remove_head(self, patient, timestamp):
+    #     # if patient.type:
+    #     #     self.remove_node(self.q1, timestamp)
+    #     # else:
+    #     #     self.remove_node(self.q0, timestamp)
+    #     self.remove_patient(patient, timestamp)
+
+    # def add_patient(self, patient: Patient, timestamp=None):
+    #     # print(self.id,self.q0_len+self.q1_len)
+    #     if self.id:
+    #         if len(self.simulation.reception.rooms[self.id - 1].doc_mu) <= self.q0_len + self.q1_len:
+    #             self.if_queue = True
+    #     else:
+    #         if 1 <= self.q0_len + self.q1_len:
+    #             self.if_queue = True
+    #     if self.id:
+    #         self.simulation.reception.rooms_q_len[self.id - 1] += 1
+    #     patient.queue = self
+    #     if patient.type:
+    #         node = Node(patient, None, self.q1_last)
+    #         self.q1_last = node
+    #         self.q1_len += 1
+    #     else:
+    #         node = Node(patient, None, self.q0_last)
+    #         self.q0_last = node
+    #         self.q0_len += 1
+    #     if node.prev is not None:
+    #         node.prev.next = node  # chaining together
+    #     if self.q0 is None:
+    #         self.q0 = self.q0_last
+    #     if self.q1 is None:
+    #         self.q1 = self.q1_last
+    #     if timestamp:
+    #         self.register_len_history(timestamp)
+    #     assert self.q0_len >= 0 and self.q1_len >= 0, 'fuq!'
+    #     return node
 
     def __len__(self):
-        return self.q0_len + self.q1_len
+        # return self.q0_len + self.q1_len
+        return len(self.listq1) + len(self.listq0)
+
+    # def head(self):
+    #     if self.q1 is not None:
+    #         return self.q1
+    #     if self.q0 is not None:
+    #         return self.q0
+    #     return None
 
     def head(self):
-        if self.q1 is not None:
-            return self.q1
-        if self.q0 is not None:
-            return self.q0
+        if self.listq1:
+            return self.listq1[0]
+        elif self.listq0:
+            return self.listq0[0]
         return None
 
     def register_len_history(self, checkpoint_time):
         if checkpoint_time != self.last_checkpoint or not self.len_history_timestamps:
             self.last_checkpoint = checkpoint_time
-            self.len_history[0].append(self.q0_len)
-            self.len_history[1].append(self.q1_len)
+            # self.len_history[0].append(self.q0_len)
+            # self.len_history[1].append(self.q1_len)
+            self.len_history[0].append(len(self.listq0))
+            self.len_history[1].append(len(self.listq1))
             self.len_history_timestamps.append(checkpoint_time)
         else:
-            self.len_history[0][-1] = self.q0_len
-            self.len_history[1][-1] = self.q1_len
+            self.len_history[0][-1] = len(self.listq0)
+            self.len_history[1][-1] = len(self.listq1)
 
     def register_finished_service(self, patient: Patient, wait_time):  # wait history and simulation history
         self.wait_history[patient.type].append(wait_time)
@@ -174,4 +206,5 @@ class QueMixin:
             self.bored_patients_count.sum(), self.bored_patients_count[0], self.bored_patients_count[1]
         )
         return 'Que #{} - time:{}\n\t* len: {} - ({}, {})\n\t{}\n\t{}\n\t{}\n'.format(
-            self.id, self.last_checkpoint, len(self), self.q0_len, self.q1_len, len_res, wait_res, patients)
+            self.id, self.last_checkpoint, len(self), len(self.listq0), len(self.listq1),  # self.q0_len, self.q1_len,
+            len_res, wait_res, patients)
